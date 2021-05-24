@@ -5,11 +5,12 @@ from gameSettings import *
 
 pygame.init()
 
-dirname = os.path.dirname(__file__)
-
-mainFont = pygame.font.SysFont("Verdana", mainFontSize)
+mainFont = pygame.font.Font(dirname+"resources/UI/mainFont.ttf", mainFontSize)
+FONT2 = pygame.font.Font(dirname+"resources/UI/mainFont.ttf", FONT2Size)
+FONT3 = pygame.font.Font(dirname+"resources/UI/mainFont.ttf", FONT3Size)
 
 clock = pygame.time.Clock()
+
 
 class Camera:
 	def __init__(self):
@@ -20,9 +21,12 @@ class Camera:
 		if click[1]:
 			self.rect.x = self.startRectPos[0] - (mousePos[0] - self.dragPos[0]) * CAMERA_MOVING_MODIFIER
 			self.rect.y = self.startRectPos[1] - (mousePos[1] - self.dragPos[1]) * CAMERA_MOVING_MODIFIER
+		if self.rect.x < -50000: self.rect.x = -50000
+		elif self.rect.x > 50000: self.rect.x = 50000
+		if self.rect.y < -50000: self.rect.y = -50000
+		elif self.rect.y > 50000: self.rect.y = 50000
 	def onEventClick(self, mousePos):
 		self.dragPos = mousePos
-		print(self.dragPos)
 		self.startRectPos = self.rect.topleft
 	def renderRect(self, _rect):
 		rect = copy.copy(_rect)
@@ -33,6 +37,32 @@ class Camera:
 		return pos
 	def checkVisible(self, rect): return True if rect.x <= screenSize[0] and rect.right >= 0 and rect.y <= screenSize[1] and rect.bottom >= 0 else False
 	def checkVPos(self, pos): return True if pos[0] <= screenSize[0] and pos[0] >= 0 and pos[1] <= screenSize[1] and pos[1] >= 0 else False
+
+class BackgroundPreview(pygame.sprite.Sprite):
+	def __init__(self, texture, x, y, width = SIZES["BackgroundPreview"][0], height = SIZES["BackgroundPreview"][1], text="", font=mainFont, text_color=(255,255,255), mode="topleft", tag=0, outlineThickn = 5):
+		pygame.sprite.Sprite.__init__(self)
+		self.rect = pygame.Rect(0, 0, width, height)
+		exec("self.rect.{} = [x, y]".format(mode))
+		self.texture = texture
+		self.tag = tag
+		self.text = font.render(text, FONTaa, text_color)
+		self.text_rect = self.text.get_rect(bottom = self.rect.bottom - 10, centerx = self.rect.centerx)
+		self.textBG = pygame.Surface(self.text.get_size())
+		self.textBG.fill((0, 0, 0))
+		self.textBG.set_alpha(70)
+		self.choosed = False
+		self.thickn = outlineThickn
+	def on_MOUSEBUTTONUP(self, mPos):
+		if uiObject_state(self.rect, mPos, True) == 2: self.choosed = True
+	def draw(self, screen):
+		self.text_rect.centerx = self.rect.centerx
+		self.text_rect.bottom = self.rect.bottom - 10
+		screen.blit(self.texture, self.rect)
+		screen.blit(self.textBG, self.text_rect)
+		screen.blit(self.text, self.text_rect)
+		if self.choosed: pygame.draw.rect(screen, (255, 255, 255), self.rect, self.thickn)
+
+
 
 class Button(pygame.sprite.Sprite):
 	def __init__(self, x, y, width=50, height=50, text="", color=(80, 80, 100), font=mainFont, tag=0, text_color=(255, 255, 255), mode="topleft", hl_color=None, pr_color=None):
@@ -46,7 +76,7 @@ class Button(pygame.sprite.Sprite):
 		self.triggered = 0
 		self.image = pygame.Surface((width, height))
 		self.image.fill(color)
-		self.text = font.render(text, True, self.text_color)
+		self.text = font.render(text, FONTaa, self.text_color)
 		self.text_rect = self.text.get_rect(center=self.rect.center)
 		
 		if pr_color == None:
@@ -141,15 +171,24 @@ time.sleep(1)
 clear()
 if sys.platform == "win32": os.system("mode {}, {}".format(str(defaultSize.columns), str(defaultSize.lines)))
 
-
-screen = pygame.display.set_mode((1280, 720))
+screen = pygame.display.set_mode(screenRes)
 screenSize = screen.get_size()
+
+
+
+
+
+
+
+
+
+
 
 clientSocket = socket.socket()
 
 del ip
-CloseButton = Button(screenSize[0] // 2 - 15, screenSize[1] // 2 + 25, 100, 50, "Close", color=(160, 100, 100), font=pygame.font.SysFont("Verdana", 25), tag="close", mode="topright")
-RetryButton = Button(screenSize[0] // 2 + 15, screenSize[1] // 2 + 25, 100, 50, "Retry", font=pygame.font.SysFont("Verdana", 25), tag="retry", mode="topleft")
+CloseButton = Button(screenSize[0] // 2 - 15, screenSize[1] // 2 + 25, 100, 50, "Close", color=(160, 100, 100), font=FONT2, tag="close", mode="topright")
+RetryButton = Button(screenSize[0] // 2 + 15, screenSize[1] // 2 + 25, 100, 50, "Retry", font=FONT2, tag="retry", mode="topleft")
 
 running = True
 
@@ -158,19 +197,27 @@ camera = Camera()
 while running:
 	try:
 		screen.fill((20, 20, 20))
-		font = pygame.font.SysFont("Verdana", 30)
-		text = font.render("Connecting...", 1, (180, 180, 180))
+		text = FONT3.render("Connecting...", FONTaa, (180, 180, 180))
 		rect = text.get_rect(center=[screenSize[0] // 2, screenSize[1] // 2])
 		screen.blit(text, rect)
 		pygame.display.flip()
 		clientSocket.connect(address)
 		clientSocket.settimeout(15)
 		clientSocket.send(nick.encode())
+		data = ""
+		while True:
+			newData = clientSocket.recv(16384).decode("utf-8")
+			if not newData: raise Exception()
+			data += newData
+			if data[-1] == "=":
+				data = json.loads(data[0:-1])
+				break
+		ServerBlocks = data["newBlocks"]
+
 		break
 	except:
 		try:
-			font = pygame.font.SysFont("Verdana", 30)
-			text = font.render("Failed to connect to {}:{}".format(str(address[0]), str(address[1])), 1, (180, 180, 180))
+			text = FONT3.render("Failed to connect to {}:{}".format(str(address[0]), str(address[1])), FONTaa, (180, 180, 180))
 			screen.fill((20, 20, 20))
 			rect = text.get_rect(center=[screenSize[0] // 2, screenSize[1] // 2 - 40])
 			screen.blit(text, rect)
@@ -198,49 +245,132 @@ while running:
 		except: pass
 connected = True
 def socketThread():
-	global clientSocket, running, connected, mPos, PlayersData, newBlocks, deletedBlocks, ServerBlocks
+	global clientSocket, running, connected, mPos, PlayersData, newBlocks, deletedBlocks, ServerBlocks, current_level, updatedBlocks
 		
 	while running:
-		try:
-			data = {"mPos": [mPos[0] + camera.rect.x, mPos[1] + camera.rect.y], "newBlocks":newBlocks, "deletedBlocks": deletedBlocks}
-			newBlocks = []
-			deletedBlocks = []
-			clientSocket.send(json.dumps(data).encode())
-			recieved = clientSocket.recv(8192).decode("utf-8")
-			if not recieved: running = False
-			recieved = json.loads(recieved)
-			PlayersData = recieved["PlayersData"]
-			for bl in recieved["updatedBlocks"]:
-				for bl2 in ServerBlocks:
-					if bl["pos"] == bl2["pos"]:
-						bl2 = bl
-			for bl in recieved["newBlocks"]:
-				ServerBlocks.append(bl)
-			for bl in recieved["deletedBlocks"]:
-				for bl2 in ServerBlocks:
-					if bl["pos"] == bl2["pos"]:
-						ServerBlocks.remove(bl)
-
-		except:
-			CloseButton.rect.centerx = screenSize[0] // 2
-			CloseButton.text_rect.centerx = screenSize[0] // 2
-			connected = False
-			break
+		#try:
+		data = {"mPos": [mPos[0] + camera.rect.x, mPos[1] + camera.rect.y], "newBlocks":newBlocks, "deletedBlocks": deletedBlocks, "updatedBlocks": updatedBlocks, "myLevel": current_level}
+		newBlocks = []
+		deletedBlocks = []
+		updatedBlocks = []
+		clientSocket.send(json.dumps(data).encode())
+		recieved = ""
+		while True:
+			_recieved = clientSocket.recv(16384).decode("utf-8")
+			if not _recieved: running, connected = False, False
+			recieved += _recieved
+			if recieved[-1] == "=":
+				recieved = recieved[:-1]
+				break
+		recieved = json.loads(recieved)
+		PlayersData = recieved["PlayersData"]
+		for bl in recieved["updatedBlocks"]:
+			for index, bl2 in enumerate(ServerBlocks):
+				if list(bl["pos"]) == list(bl2["pos"]) and bl["level"] == bl2["level"]:
+					ServerBlocks[index] = bl
+		for bl in recieved["newBlocks"]:
+			ServerBlocks.append(bl)
+		for bl in recieved["deletedBlocks"]:
+			for bl2 in ServerBlocks:
+				if bl["pos"] == bl2["pos"] and bl["level"] == bl2["level"]:
+					ServerBlocks.remove(bl2)
+		#except:
+			# CloseButton.rect.centerx = screenSize[0] // 2
+			# CloseButton.text_rect.centerx = screenSize[0] // 2
+			# connected = False
+			# break
 PlayersData = []
 newBlocks = []
 deletedBlocks = []
-ServerBlocks = []
-socketTh = threading.Thread(target=socketThread)
-socketTh.start()
+updatedBlocks = []
 pygame.mouse.set_visible(False)
+
+def loadTextureGroup(path, count, size=[layoutCellSize, layoutCellSize]):
+	group = []
+	for i in range(count):
+		group.append( pygame.transform.scale(pygame.image.load(dirname+path+str(i)+".png").convert_alpha(), size) )
+	return group
+
+
 backgroundControl = {}
 backgroundControl["active"] = False
-backgroundControl["CloseBGCButton"] = Button(screenSize[0], screenSize[1] - backgroundControlSettings["surfaceHeight"], 35, 35, "X", text_color=(10, 10, 10), color=(160, 0, 0), font=mainFont, tag="BGSclose", mode="topright")
-backgroundControl["OpenBGCButton"] = Button(screenSize[0] - 5, screenSize[1] - 5, 117, 45, "Backgrounds", text_color=(10, 10, 10), color=(160, 160, 0), font=mainFont, tag="BGS", mode="bottomright")
-backgroundControl["surface"] = pygame.Surface((screenSize[0], backgroundControlSettings["surfaceHeight"]))
-backgroundControl["surface"].fill(backgroundControlSettings["surfaceFillColor"])
+
+backgroundControl["SurfRect"] = pygame.Rect(0, screenSize[1] - backgroundControlSettings["surfaceHeight"], screenSize[0], backgroundControlSettings["surfaceHeight"])
+
+backgroundControl["CloseBGCButton"] = Button(screenSize[0], backgroundControl["SurfRect"].top, 35, 35, "X", text_color=(255, 255, 255), color=(160, 0, 0), font=mainFont, tag="BGSclose", mode="topright")
+backgroundControl["OpenBGCButton"] = Button(screenSize[0] - 5, screenSize[1] - 5, 117, 45, "Backgrounds", text_color=(10, 10, 10), color=(200, 170, 20), font=mainFont, tag="BGS", mode="bottomright")
+
+backgroundControl["openAnim"] = 0
+backgroundControl["closeAnim"] = 0
+
+backgroundControlSettings["BackgroundImage"] = pygame.transform.scale(pygame.image.load(dirname+"resources/Backgrounds/BGSControl.png").convert_alpha(), SIZES["BGSControlBackground"])
+
+surf = pygame.Surface((screenSize[0], backgroundControlSettings["surfaceHeight"]))
+for x in range(math.ceil(screenSize[0] / SIZES["BGSControlBackground"][0])):
+	for y in range(math.ceil(backgroundControlSettings["surfaceHeight"] / SIZES["BGSControlBackground"][1])):
+		surf.blit(backgroundControlSettings["BackgroundImage"], (x * SIZES["BGSControlBackground"][0], y * SIZES["BGSControlBackground"][1]))
+backgroundControl["BackgroundImage"] = surf
 
 
+
+PlayerIndicatorImage = pygame.transform.scale(pygame.image.load(dirname+"resources/UI/friendIndic.png").convert_alpha(), SIZES["PlayerIndicator"])
+
+CobblestoneImage = pygame.transform.scale(pygame.image.load(dirname+"resources/backgrounds/cobblestone.png").convert_alpha(), SIZES["BackgroundTile"])
+
+GeneratorImage = pygame.transform.scale(pygame.image.load(dirname+"resources/blocks/generator.png").convert_alpha(), [layoutCellSize, layoutCellSize])
+leverImage = loadTextureGroup("resources/blocks/lever", 2)
+NotImage = pygame.transform.scale(pygame.image.load(dirname+"resources/blocks/not.png").convert_alpha(), [layoutCellSize, layoutCellSize])
+PGImage = pygame.transform.scale(pygame.image.load(dirname+"resources/blocks/pulse_gen.png").convert_alpha(), [layoutCellSize, layoutCellSize])
+
+BlockControl = {"active": False, "openButton": Button(screenSize[0] - 5, backgroundControl["OpenBGCButton"].rect.top - 5, 117, 45, "Blocks", text_color=(10, 10, 10), color=(20, 200, 20), font=mainFont, tag="Blocks", mode="bottomright")}
+
+BACKGROUNDS = { }
+BACKGROUNDS["cobblestone"] = pygame.Surface((screenSize[0] + SIZES["BackgroundTile"][0], screenSize[1] + SIZES["BackgroundTile"][1]))
+for x in range(math.ceil(screenSize[0] / SIZES["BackgroundTile"][0]) + 1):
+	for y in range(math.ceil(screenSize[1] / SIZES["BackgroundTile"][1]) + 1):
+		BACKGROUNDS["cobblestone"].blit(CobblestoneImage, (x * SIZES["BackgroundTile"][0], y * SIZES["BackgroundTile"][1]))
+
+gray = (90, 90, 90)
+
+backgroundPreviews = []
+surf = pygame.Surface(SIZES["BackgroundPreview"])
+surf.fill(gray)
+backgroundPreviews.append(BackgroundPreview(surf, 0, 0, *SIZES["BackgroundPreview"], "Gray", tag = "gray"))
+backgroundPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
+backgroundPreviews[-1].rect.x = 20
+
+backgroundPreviews.append(BackgroundPreview(pygame.transform.scale(CobblestoneImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Cobblestone", tag = "cobblestone"))
+backgroundPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
+backgroundPreviews[-1].rect.x = backgroundPreviews[-2].rect.right + 20
+backgroundPreviews[-1].choosed = True
+
+blockPreviews = []
+
+blockPreviews.append(BackgroundPreview(pygame.transform.scale(GeneratorImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Generator", tag = "Generator"))
+blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
+blockPreviews[-1].rect.x = 20
+blockPreviews[-1].choosed = True
+
+blockPreviews.append(BackgroundPreview(pygame.transform.scale(leverImage[0], SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Lever", tag = "Lever"))
+blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
+blockPreviews[-1].rect.x = blockPreviews[-2].rect.right + 20
+
+blockPreviews.append(BackgroundPreview(pygame.transform.scale(NotImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Not", tag = "Not"))
+blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
+blockPreviews[-1].rect.x = blockPreviews[-2].rect.right + 20
+
+blockPreviews.append(BackgroundPreview(pygame.transform.scale(PGImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Pulse gen.", tag = "Pulse_gen"))
+blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
+blockPreviews[-1].rect.x = blockPreviews[-2].rect.right + 20
+
+connecting = [False, {}]
+
+current_level = 0
+current_background = "cobblestone"
+choosed_block = "Generator"
+
+socketTh = threading.Thread(target=socketThread)
+socketTh.start()
 
 while running:
 	click = pygame.mouse.get_pressed()
@@ -254,81 +384,193 @@ while running:
 		if event.type == pygame.MOUSEMOTION:
 			mPos = event.pos
 	if connected:
+		pos = [(camera.rect.x + mPos[0]) // layoutCellSize, (camera.rect.y + mPos[1]) // layoutCellSize]
 		for event in events:
 			if event.type == pygame.MOUSEBUTTONDOWN:
 				if event.button == 2:
 					camera.onEventClick(mPos)
 				elif not ((backgroundControl["active"] == False and mPos[1] > backgroundControl["OpenBGCButton"].rect.top and mPos[1] < backgroundControl["OpenBGCButton"].rect.bottom and mPos[0] > backgroundControl["OpenBGCButton"].rect.left and mPos[0] < backgroundControl["OpenBGCButton"].rect.right) or (backgroundControl["active"] and mPos[1] > screenSize[1] - backgroundControlSettings["surfaceHeight"])):
 					if event.button == 3:
-						if not list(pos) in [list(bl["pos"]) for bl in ServerBlocks]:
-							newBlocks.append({"type":"Cable", "pos":pos})
-					elif event.button == 1:
-						if list(pos) in [list(bl["pos"]) for bl in ServerBlocks]:
+						canBePlaced = True
+						if len(ServerBlocks) > 0:
 							for bl in ServerBlocks:
-								if list(bl["pos"]) == list(pos):
-									deletedBlocks.append(bl)
+								if pos == bl["pos"] and current_level == bl["level"]:
+									canBePlaced = False
+									break
+						if canBePlaced:
+							if choosed_block == "Generator": newBlocks.append({ "type": "Generator", "pos": list(pos), "level": current_level, "out": True, "connections": [], "inputs": []})
+							elif choosed_block == "Not": newBlocks.append({ "type": "Not", "pos": list(pos), "level": current_level, "out": False, "connections": [], "inputs": [False], "is_connected": [False] })
+					elif event.button == 1:
+						for bl in ServerBlocks:
+							if pos == bl["pos"] and current_level == bl["level"]:
+								deletedBlocks.append(bl)
+			elif event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_f:
+					if current_level < 100: current_level += 1
+				elif event.key == pygame.K_g:
+					if current_level > 0: current_level -= 1
+				elif event.key == pygame.K_e:
+					if not backgroundControl["active"]:
+						backgroundControl["active"] = True
+						BlockControl["active"] = True
+						backgroundControl["openAnim"] = 0.5
+					else:
+						backgroundControl["active"] = False
+						BlockControl["active"] = False
+						backgroundControl["closeAnim"] = 1
+				elif event.key == pygame.K_r:
+					if not connecting[0]:
+						for bl in ServerBlocks:
+							if bl["pos"] == pos and bl["level"] == current_level and (bl["type"] == "Generator" or bl["type"] == "Not"):
+								connecting[0] = True
+								connecting[1] = bl
+								print(connecting)
+				elif event.key == pygame.K_t:
+					if connecting[0]:
+						for bl in ServerBlocks:
+							if bl["pos"] == pos and bl["level"] == current_level and (bl["type"] == "Not"):
+								for bl2 in ServerBlocks:
+									if bl2["pos"] == connecting[1]["pos"] and bl2["level"] == connecting[1]["level"]:
+										if not bl["is_connected"][0]:
+											print(1)
+											bl["is_connected"] = [True, {"pos": bl2["pos"], "level": bl2["level"]}]
+											updatedBlocks.append(bl)
+											if bl["type"] == "Not":
+												bl2["connections"].append([{"pos": bl["pos"], "level": bl["level"]}, 0])
+												updatedBlocks.append(bl2)
+												print(bl2, bl)
+
+
+
 		camera.move(click, mPos)
-		pos = ((camera.rect.x + mPos[0]) // layoutCellSize, (camera.rect.y + mPos[1]) // layoutCellSize)
 
-		screen.fill((120, 120, 120))
-
-		try:
-			x2, y2 = mPos
-			x1, y1 = screenSize[0] // 2, screenSize[1] // 2
-			angle = math.atan( (y2 - y1) / (x2 - x1) )
-			if x2 > x1: angle += math.pi
-			#angle = math.degrees(angle)
-			print(angle)
-			print(x1 - x1 * math.cos(angle), y1 - y1 * math.sin(angle))
-		except ZeroDivisionError: print(0)
+		if current_background != "gray":
+			screen.blit(BACKGROUNDS[current_background], [-camera.rect.x % SIZES["BackgroundTile"][0] - SIZES["BackgroundTile"][0], -camera.rect.y % SIZES["BackgroundTile"][1] - SIZES["BackgroundTile"][1]])
+		else:
+			screen.fill(gray)
 
 		for bl in ServerBlocks:
-			if bl["type"] == "Cable":
-				rect = camera.renderRect(pygame.Rect(bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize, layoutCellSize, layoutCellSize))
-				if camera.checkVisible(rect):
-					pygame.draw.rect(screen, (255, 255, 255), rect)
+			if bl["level"] == current_level:
+				if bl["type"] == "Generator":
+					screen.blit(GeneratorImage, camera.renderPos([bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize]))
+				elif bl["type"] == "Not":
+					screen.blit(NotImage, camera.renderPos([bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize]))
 		if not ((backgroundControl["active"] == False and mPos[1] > backgroundControl["OpenBGCButton"].rect.top and mPos[1] < backgroundControl["OpenBGCButton"].rect.bottom and mPos[0] > backgroundControl["OpenBGCButton"].rect.left and mPos[0] < backgroundControl["OpenBGCButton"].rect.right) or (backgroundControl["active"] and mPos[1] > screenSize[1] - backgroundControlSettings["surfaceHeight"])):
-			color = layoutColor1 if not list(pos) in [list(bl["pos"]) for bl in ServerBlocks] else layoutColor2
+			noBlocks = True
+			for bl in ServerBlocks:
+				if bl["pos"] == pos and bl["level"] == current_level:
+					surf = pygame.Surface((layoutCellSize, layoutCellSize))
+					surf.fill((10, 10, 10))
+					surf.set_alpha(90)
+					text1 = mainFont.render("IN: "+str(bl["inputs"]), FONTaa, (255, 255, 255))
+					text2 = mainFont.render("OUT: "+str(bl["out"]), FONTaa, (255, 255, 255))
+					rect1 = text1.get_rect(centerx = bl["pos"][0] * layoutCellSize + layoutCellSize // 2)
+					rect2 = text2.get_rect(centerx = bl["pos"][0] * layoutCellSize + layoutCellSize // 2)
+					rect1.bottom = bl["pos"][1] * layoutCellSize + layoutCellSize // 2
+					rect2.top = rect1.bottom
+					noBlocks = False
+					break
+			color = layoutColor1 if noBlocks else layoutColor2
 			pygame.draw.rect(screen, color, camera.renderRect(pygame.Rect(pos[0] * layoutCellSize, pos[1] * layoutCellSize, layoutCellSize, layoutCellSize)), layoutThickn)
+			if not noBlocks:
+				screen.blit(surf, (pos[0] * layoutCellSize, pos[1] * layoutCellSize))
+				screen.blit(text1, rect1)
+				screen.blit(text2, rect2)
 
 
 		for i in PlayersData:
-			pos2 = camera.renderPos(i["mPos"])
-			if camera.checkVPos(pos2): pygame.draw.circle(screen, Cursors["other"]["color"], pos2, Cursors["other"]["radius"])
-			text = mainFont.render(i["nickname"], True, Cursors["other"]["textColor"])
-			textSize = text.get_size()
-			surf = pygame.Surface(textSize)
-			surf.set_alpha(Cursors["other"]["textBackgroundAlpha"])
-			surf.fill((0, 0, 0))
-			textRect = text.get_rect(center = (pos2[0], pos2[1] - 27))
-			if camera.checkVisible(textRect):
-				screen.blit(surf, textRect)
-				screen.blit(text, textRect)
+			if i["level"] == current_level:
+				pos2 = camera.renderPos(i["mPos"])
+				if camera.checkVPos(pos2): pygame.draw.circle(screen, Cursors["other"]["color"], pos2, Cursors["other"]["radius"])
+				text = mainFont.render(i["nickname"], FONTaa, Cursors["other"]["textColor"])
+				textSize = text.get_size()
+				surf = pygame.Surface(textSize)
+				surf.set_alpha(Cursors["other"]["textBackgroundAlpha"])
+				surf.fill((0, 0, 0))
+				textRect = text.get_rect(center = (pos2[0], pos2[1] - 27))
+				if camera.checkVisible(textRect):
+					screen.blit(surf, textRect)
+					screen.blit(text, textRect)
+				if not camera.checkVPos(pos2):
+					try:
+						x2, y2 = i["mPos"]
+						x1, y1 = screenSize[0] // 2, screenSize[1] // 2
+						angle = math.atan( (y2 - y1) / (x2 - x1) )
+						if x2 > x1: angle += math.pi
+					except ZeroDivisionError: angle = 0
+					x3, y3 = int(x1 - (y1 - 16) * math.cos(angle)), int(y1 - (y1 - 16) * math.sin(angle))
+					img = pygame.transform.rotate(PlayerIndicatorImage, -math.degrees(angle))
+					rect = img.get_rect(center=[x3,y3])
+					screen.blit(img, rect)
+
 		if backgroundControl["active"]:
 			for event in events:
 				if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
 					backgroundControl["CloseBGCButton"].on_MOUSEBUTTONUP(mPos)
+					if not BlockControl["active"]:
+						for pr in backgroundPreviews:
+							pr.on_MOUSEBUTTONUP(mPos)
+							if pr.choosed:
+								current_background = pr.tag
+								for pr2 in backgroundPreviews:
+									if pr2 != pr: pr2.choosed = False
+					else:
+						for pr in blockPreviews:
+							pr.on_MOUSEBUTTONUP(mPos)
+							if pr.choosed:
+								choosed_block = pr.tag
+								for pr2 in blockPreviews:
+									if pr2 != pr: pr2.choosed = False
 
-			backgroundControl["CloseBGCButton"].update(mPos, click)
+			backgroundControl["CloseBGCButton"].update(mPos, click[0])
 			if backgroundControl["CloseBGCButton"].eventTrigger():
 				backgroundControl["active"] = False
-			
-			screen.blit(backgroundControl["surface"], (0, screenSize[1] - backgroundControl["surface"].get_size()[1]))
-			backgroundControl["CloseBGCButton"].draw(screen)
+				BlockControl["active"] = False
+				backgroundControl["closeAnim"] = 1
+			if backgroundControl["openAnim"] > 0:
+				anim = backgroundControlSettings["surfaceHeight"] * backgroundControl["openAnim"]
+				screen.blit(backgroundControl["BackgroundImage"], (0, backgroundControl["SurfRect"].top + anim))
+				screen.blit(backgroundControl["CloseBGCButton"].image, (backgroundControl["CloseBGCButton"].rect.x, backgroundControl["CloseBGCButton"].rect.y + anim))
+				screen.blit(backgroundControl["CloseBGCButton"].text, (backgroundControl["CloseBGCButton"].text_rect.x, backgroundControl["CloseBGCButton"].text_rect.y + anim))
+				backgroundControl["openAnim"] -= 0.15
+			else:
+				screen.blit(backgroundControl["BackgroundImage"], backgroundControl["SurfRect"])
+				if not BlockControl["active"]:
+					for pr in backgroundPreviews: pr.draw(screen)
+				else:
+					for pr in blockPreviews: pr.draw(screen)
+				backgroundControl["CloseBGCButton"].draw(screen)
+
 		else:
 			for event in events:
 				if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
 					backgroundControl["OpenBGCButton"].on_MOUSEBUTTONUP(mPos)
+					BlockControl["openButton"].on_MOUSEBUTTONUP(mPos)
 
-			backgroundControl["OpenBGCButton"].update(mPos, click)
+			backgroundControl["OpenBGCButton"].update(mPos, click[0])
+			BlockControl["openButton"].update(mPos, click[0])
 			if backgroundControl["OpenBGCButton"].eventTrigger():
 				backgroundControl["active"] = True
+				backgroundControl["openAnim"] = 1
+			elif BlockControl["openButton"].eventTrigger():
+				backgroundControl["active"] = True
+				backgroundControl["openAnim"] = 1
+				BlockControl["active"] = True
 
-			backgroundControl["OpenBGCButton"].draw(screen)
+			if backgroundControl["closeAnim"] > 0:
+				anim = backgroundControlSettings["surfaceHeight"] * (1 - backgroundControl["closeAnim"])
+				screen.blit(backgroundControl["BackgroundImage"], (0, backgroundControl["SurfRect"].top + anim))
+				screen.blit(backgroundControl["CloseBGCButton"].image, (backgroundControl["CloseBGCButton"].rect.x, backgroundControl["CloseBGCButton"].rect.y + anim))
+				screen.blit(backgroundControl["CloseBGCButton"].text, (backgroundControl["CloseBGCButton"].text_rect.x, backgroundControl["CloseBGCButton"].text_rect.y + anim))
+				backgroundControl["closeAnim"] -= 0.20
+			else:
+				backgroundControl["OpenBGCButton"].draw(screen)
+				BlockControl["openButton"].draw(screen)
+		text = FONT3.render("Floor: "+str(current_level), FONTaa, (255, 255, 255))
+		screen.blit(text, (screenSize[0] // 2 - text.get_size()[0] // 2, 15))
 
 	else:
-		font = pygame.font.SysFont("Verdana", 30)
-		text = font.render("Lost connection or server closed", 1, (180, 180, 180))
+		text = FONT3.render("Lost connection or server closed", FONTaa, (180, 180, 180))
 		rect = text.get_rect(center=[screenSize[0] // 2, screenSize[1] // 2])
 		CloseButton.update(mPos, click[0])
 		if CloseButton.state == 2:

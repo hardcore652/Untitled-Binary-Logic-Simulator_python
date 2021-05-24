@@ -1,17 +1,32 @@
+import os
+
 Cursors = {"self": {"radius":8, "color": (255, 255, 255)},
 			"other": {"radius":8, "color": (200, 200, 255), "textColor": (255, 255, 255), "textBackgroundAlpha": 100}}
 
 layoutColor1 = (40, 240, 40)
 layoutColor2 = (240, 40, 40)
-layoutCellSize = 50
+layoutCellSize = 64
 layoutThickn = 1
+
+screenRes = (1280, 720)
+
+dirname = os.path.dirname(__file__)+"/"
 
 CAMERA_MOVING_MODIFIER = 2
 
 version = "0.1"
 
+
+SIZES = {
+	"PlayerIndicator": [64, 64],
+	"BGSControlBackground": [96, 96],
+	"BackgroundTile": [96, 96],
+	"BackgroundPreview": [128, 128]
+}
+
 backgroundControlSettings = {"surfaceHeight": 200}
-backgroundControlSettings["surfaceFillColor"] = [150, 150, 150]
+
+
 
 current_screen = [
 	"██████████████████████████████████████████████████",
@@ -43,4 +58,7 @@ title_screen = [
 	"█   █   █ ███ ██  ██   █ █ ██ ██   █ █ ███████████",
 	"██████████████████████████████████████████████████" ]
 
-mainFontSize = 18
+mainFontSize = 30
+FONT2Size = 38
+FONT3Size = 46
+FONTaa = False
