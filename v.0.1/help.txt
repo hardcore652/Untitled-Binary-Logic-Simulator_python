@@ -1,0 +1,18 @@
+For host:
+	Console Commands:
+		SaveWorld <name>
+		examples: saveworld test_world ,  saveworld test_world.json
+		description: this will save your world to server/saves/<name>.json
+
+		...
+
+For client:
+	Controls:
+		LMB = Destroy blocks
+		RMB = Place blocks
+		MMB + moving mouse = Move Camera
+		W, A, S, D = Move Camera
+		F, G = Change Floor
+		R = New connection / Cancel connecting
+		T = End connection / Move connection
+		MouseWheelDown, MouseWheelUp = Change the speed of the camera

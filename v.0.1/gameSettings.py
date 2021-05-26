@@ -3,16 +3,26 @@ import os
 Cursors = {"self": {"radius":8, "color": (255, 255, 255)},
 			"other": {"radius":8, "color": (200, 200, 255), "textColor": (255, 255, 255), "textBackgroundAlpha": 100}}
 
+
 layoutColor1 = (40, 240, 40)
 layoutColor2 = (240, 40, 40)
 layoutCellSize = 64
 layoutThickn = 1
-
+cableThickn = 4
+blockInfoAlpha = 60
 screenRes = (1280, 720)
 
 dirname = os.path.dirname(__file__)+"/"
 
 CAMERA_MOVING_MODIFIER = 2
+CAMERA_MOVING_SPEED = 20
+MAX_CAMERA_MOVING_SPEED = 90
+MAX_CAMERA_MOVING_MODIFIER = 4
+MIN_CAMERA_MOVING_SPEED = 10
+MIN_CAMERA_MOVING_MODIFIER = 0.5
+STEP_CAMERA_MOVING_MODIFIER = 0.2
+STEP_CAMERA_MOVING_SPEED = 5
+
 
 version = "0.1"
 
