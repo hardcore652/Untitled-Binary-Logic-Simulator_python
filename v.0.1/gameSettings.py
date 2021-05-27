@@ -35,7 +35,7 @@ SIZES = {
 }
 
 backgroundControlSettings = {"surfaceHeight": 200}
-
+blockPreview_anim_speed = 50 # ticks
 
 
 current_screen = [

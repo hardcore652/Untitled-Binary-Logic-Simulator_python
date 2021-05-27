@@ -5,14 +5,14 @@ from gameSettings import *
 
 pygame.init()
 
-mainFont = pygame.font.Font(dirname+"resources/UI/mainFont.ttf", mainFontSize)
+mainFont = pygame.font.Font(dirname+"resources/UI/mainFont.ttf", mainFontSize) # Load fonts
 FONT2 = pygame.font.Font(dirname+"resources/UI/mainFont.ttf", FONT2Size)
 FONT3 = pygame.font.Font(dirname+"resources/UI/mainFont.ttf", FONT3Size)
 
-clock = pygame.time.Clock()
+clock = pygame.time.Clock() # Clock for fps limit
 
 
-class Message:
+class Message: # Message is the text that disappears after the specified time has elapsed
 	def __init__(self, x, y, text, timer, text_color = (255, 255, 255), font=FONT2, is_alive = True, mode="topleft"):
 		self.text_color = text_color
 		self.font = font
@@ -33,9 +33,10 @@ class Message:
 
 	def draw(self, screen):
 		curr_time = time.time()
+		if self.is_alive and not self.was_alive:
+			self.timer = curr_time
 		if curr_time - self.timer >= self.alive_timer:
 			self.is_alive = False
-		if self.is_alive and not self.was_alive: self.timer = curr_time
 		self.was_alive = self.is_alive
 		if self.is_alive:
 			screen.blit(self.text, self.rect)
@@ -73,11 +74,11 @@ class Camera:
 	def checkVPos(self, pos): return True if pos[0] <= screenSize[0] and pos[0] >= 0 and pos[1] <= screenSize[1] and pos[1] >= 0 else False
 
 class BackgroundPreview(pygame.sprite.Sprite):
-	def __init__(self, texture, x, y, width = SIZES["BackgroundPreview"][0], height = SIZES["BackgroundPreview"][1], text="", font=mainFont, text_color=(255,255,255), mode="topleft", tag=0, outlineThickn = 5):
+	def __init__(self, textures, x, y, width = SIZES["BackgroundPreview"][0], height = SIZES["BackgroundPreview"][1], text="", font=mainFont, text_color=(255,255,255), mode="topleft", tag=0, outlineThickn = 5):
 		pygame.sprite.Sprite.__init__(self)
 		self.rect = pygame.Rect(0, 0, width, height)
 		exec("self.rect.{} = [x, y]".format(mode))
-		self.texture = texture
+		self.texture = textures
 		self.tag = tag
 		self.text = font.render(text, FONTaa, text_color)
 		self.text_rect = self.text.get_rect(bottom = self.rect.bottom - 10, centerx = self.rect.centerx)
@@ -86,12 +87,17 @@ class BackgroundPreview(pygame.sprite.Sprite):
 		self.textBG.set_alpha(70)
 		self.choosed = False
 		self.thickn = outlineThickn
+		self.current_texture = 0
+	def swapTexture(self):
+		if len(self.texture) > 1:
+			self.current_texture += 1
+			if self.current_texture >= len(self.texture): self.current_texture = 0
 	def on_MOUSEBUTTONUP(self, mPos):
 		if uiObject_state(self.rect, mPos, True) == 2: self.choosed = True
 	def draw(self, screen):
 		self.text_rect.centerx = self.rect.centerx
 		self.text_rect.bottom = self.rect.bottom - 10
-		screen.blit(self.texture, self.rect)
+		screen.blit(self.texture[self.current_texture], self.rect)
 		screen.blit(self.textBG, self.text_rect)
 		screen.blit(self.text, self.text_rect)
 		if self.choosed: pygame.draw.rect(screen, (255, 255, 255), self.rect, self.thickn)
@@ -279,15 +285,17 @@ while running:
 		except: pass
 connected = True
 def socketThread():
-	global clientSocket, running, connected, mPos, PlayersData, newBlocks, deletedBlocks, ServerBlocks, current_level, updatedBlocks
+	global clientSocket, running, connected, mPos, PlayersData, newBlocks, deletedBlocks, ServerBlocks, current_level, updatedBlocks, connecting
 		
 	while running:
 		#try:
-		data = {"mPos": [mPos[0] + camera.rect.x, mPos[1] + camera.rect.y], "newBlocks":newBlocks, "deletedBlocks": deletedBlocks, "updatedBlocks": updatedBlocks, "myLevel": current_level}
+		data = {"mPos": [mPos[0] + camera.rect.x, mPos[1] + camera.rect.y], "newBlocks":newBlocks,
+			"deletedBlocks": deletedBlocks, "updatedBlocks": updatedBlocks,
+			"myLevel": current_level, "connecting": connecting}
 		newBlocks = []
 		deletedBlocks = []
 		updatedBlocks = []
-		clientSocket.send(json.dumps(data).encode())
+		clientSocket.send((json.dumps(data)+"=").encode())
 		recieved = ""
 		while True:
 			_recieved = clientSocket.recv(16384).decode("utf-8")
@@ -356,6 +364,7 @@ LeverImage = loadTextureGroup("resources/blocks/lever", 2)
 NotImage = pygame.transform.scale(pygame.image.load(dirname+"resources/blocks/not.png").convert_alpha(), [layoutCellSize, layoutCellSize])
 PGImage = pygame.transform.scale(pygame.image.load(dirname+"resources/blocks/pulse_gen.png").convert_alpha(), [layoutCellSize, layoutCellSize])
 ORImage = pygame.transform.scale(pygame.image.load(dirname+"resources/blocks/or.png").convert_alpha(), [layoutCellSize, layoutCellSize])
+LampImage = loadTextureGroup("resources/blocks/lamp", 2)
 
 BlockControl = {"active": False, "openButton": Button(screenSize[0] - 5, backgroundControl["OpenBGCButton"].rect.top - 5, 117, 45, "Blocks", text_color=(10, 10, 10), color=(20, 200, 20), font=mainFont, tag="Blocks", mode="bottomright")}
 
@@ -370,35 +379,39 @@ gray = (90, 90, 90)
 backgroundPreviews = []
 surf = pygame.Surface(SIZES["BackgroundPreview"])
 surf.fill(gray)
-backgroundPreviews.append(BackgroundPreview(surf, 0, 0, *SIZES["BackgroundPreview"], "Gray", tag = "gray"))
+backgroundPreviews.append(BackgroundPreview([surf], 0, 0, *SIZES["BackgroundPreview"], "Gray", tag = "gray"))
 backgroundPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
 backgroundPreviews[-1].rect.x = 20
 
-backgroundPreviews.append(BackgroundPreview(pygame.transform.scale(CobblestoneImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Cobblestone", tag = "cobblestone"))
+backgroundPreviews.append(BackgroundPreview([pygame.transform.scale(CobblestoneImage, SIZES["BackgroundPreview"])], 0, 0, *SIZES["BackgroundPreview"], "Cobblestone", tag = "cobblestone"))
 backgroundPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
 backgroundPreviews[-1].rect.x = backgroundPreviews[-2].rect.right + 20
 backgroundPreviews[-1].choosed = True
 
 blockPreviews = []
 
-blockPreviews.append(BackgroundPreview(pygame.transform.scale(GeneratorImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Generator", tag = "Generator"))
+blockPreviews.append(BackgroundPreview([pygame.transform.scale(GeneratorImage, SIZES["BackgroundPreview"])], 0, 0, *SIZES["BackgroundPreview"], "Generator", tag = "Generator"))
 blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
 blockPreviews[-1].rect.x = 20
 blockPreviews[-1].choosed = True
 
-blockPreviews.append(BackgroundPreview(pygame.transform.scale(LeverImage[0], SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Lever", tag = "Lever"))
+blockPreviews.append(BackgroundPreview([pygame.transform.scale(LeverImage[0], SIZES["BackgroundPreview"]), pygame.transform.scale(LeverImage[1], SIZES["BackgroundPreview"])], 0, 0, *SIZES["BackgroundPreview"], "Lever", tag = "Lever"))
 blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
 blockPreviews[-1].rect.x = blockPreviews[-2].rect.right + 20
 
-blockPreviews.append(BackgroundPreview(pygame.transform.scale(NotImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "NOT Gate", tag = "Not"))
+blockPreviews.append(BackgroundPreview([pygame.transform.scale(NotImage, SIZES["BackgroundPreview"])], 0, 0, *SIZES["BackgroundPreview"], "NOT Gate", tag = "Not"))
 blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
 blockPreviews[-1].rect.x = blockPreviews[-2].rect.right + 20
 
-blockPreviews.append(BackgroundPreview(pygame.transform.scale(PGImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "Pulse gen.", tag = "Pulse_gen"))
+blockPreviews.append(BackgroundPreview([pygame.transform.scale(PGImage, SIZES["BackgroundPreview"])], 0, 0, *SIZES["BackgroundPreview"], "Pulse gen.", tag = "Pulse_gen"))
 blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
 blockPreviews[-1].rect.x = blockPreviews[-2].rect.right + 20
 
-blockPreviews.append(BackgroundPreview(pygame.transform.scale(ORImage, SIZES["BackgroundPreview"]), 0, 0, *SIZES["BackgroundPreview"], "OR Gate", tag = "OR"))
+blockPreviews.append(BackgroundPreview([pygame.transform.scale(ORImage, SIZES["BackgroundPreview"])], 0, 0, *SIZES["BackgroundPreview"], "OR Gate", tag = "OR"))
+blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
+blockPreviews[-1].rect.x = blockPreviews[-2].rect.right + 20
+
+blockPreviews.append(BackgroundPreview([pygame.transform.scale(LampImage[0], SIZES["BackgroundPreview"]), pygame.transform.scale(LampImage[1], SIZES["BackgroundPreview"])], 0, 0, *SIZES["BackgroundPreview"], "Lamp", tag = "Lamp"))
 blockPreviews[-1].rect.centery = backgroundControl["SurfRect"].centery
 blockPreviews[-1].rect.x = blockPreviews[-2].rect.right + 20
 
@@ -407,6 +420,10 @@ connecting = [False, {}]
 current_level = 0
 current_background = "cobblestone"
 choosed_block = "Generator"
+
+blockPreviews_anim_step = 0
+
+ticks = 0
 
 CameraSpeedMessage = Message(screenSize[0] // 2, 100, "Camera speed: 20/2x", 3, is_alive = False, mode="center")
 
@@ -432,34 +449,15 @@ while running:
 			mPos = event.pos
 	if connected:
 		pos = [(camera.rect.x + mPos[0]) // layoutCellSize, (camera.rect.y + mPos[1]) // layoutCellSize]
+		if ticks % blockPreview_anim_speed == 0:
+			blockPreviews_anim_step += 1
+			if BlockControl["active"]:
+				for pr in blockPreviews:
+					pr.swapTexture()
 		for event in events:
 			if event.type == pygame.MOUSEBUTTONDOWN:
 				if event.button == 2:
 					camera.onEventClick(mPos)
-				elif event.button == 4:
-					print(CAMERA_MOVING_SPEED, MAX_CAMERA_MOVING_SPEED, CAMERA_MOVING_MODIFIER, MAX_CAMERA_MOVING_MODIFIER)
-					if CAMERA_MOVING_SPEED < MAX_CAMERA_MOVING_SPEED:
-						CAMERA_MOVING_SPEED += STEP_CAMERA_MOVING_SPEED
-						if CAMERA_MOVING_SPEED > MAX_CAMERA_MOVING_SPEED:
-							CAMERA_MOVING_SPEED = MAX_CAMERA_MOVING_SPEED
-					if CAMERA_MOVING_MODIFIER < MAX_CAMERA_MOVING_MODIFIER:
-						CAMERA_MOVING_MODIFIER += STEP_CAMERA_MOVING_MODIFIER
-						if CAMERA_MOVING_MODIFIER > MAX_CAMERA_MOVING_MODIFIER:
-							CAMERA_MOVING_MODIFIER = MAX_CAMERA_MOVING_MODIFIER
-					CameraSpeedMessage.changeText("Camera speed: {}/{}x".format(CAMERA_MOVING_SPEED, CAMERA_MOVING_MODIFIER))
-					CameraSpeedMessage.is_alive = True
-				elif event.button == 5:
-					print(CAMERA_MOVING_SPEED, MIN_CAMERA_MOVING_SPEED, CAMERA_MOVING_MODIFIER, MIN_CAMERA_MOVING_MODIFIER)
-					if CAMERA_MOVING_SPEED > MIN_CAMERA_MOVING_SPEED:
-						CAMERA_MOVING_SPEED -= STEP_CAMERA_MOVING_SPEED
-						if CAMERA_MOVING_SPEED < MIN_CAMERA_MOVING_SPEED:
-							CAMERA_MOVING_SPEED = MIN_CAMERA_MOVING_SPEED
-					if CAMERA_MOVING_MODIFIER > MIN_CAMERA_MOVING_MODIFIER:
-						CAMERA_MOVING_MODIFIER -= STEP_CAMERA_MOVING_MODIFIER
-						if CAMERA_MOVING_MODIFIER < MIN_CAMERA_MOVING_MODIFIER:
-							CAMERA_MOVING_MODIFIER = MIN_CAMERA_MOVING_MODIFIER
-					CameraSpeedMessage.changeText("Camera speed: {}/{}x".format(CAMERA_MOVING_SPEED, CAMERA_MOVING_MODIFIER))
-					CameraSpeedMessage.is_alive = True
 
 				elif not mouseOnUI():
 					if event.button == 3:
@@ -471,11 +469,15 @@ while running:
 									canBePlaced = False
 									current_block = bl
 									break
+						block = {}
 						if canBePlaced:
-							if choosed_block == "Generator": newBlocks.append({ "type": "Generator", "pos": list(pos), "level": current_level, "out": True, "connections": [], "inputs": [], "is_connected": []})
-							elif choosed_block == "Not": newBlocks.append({ "type": "Not", "pos": list(pos), "level": current_level, "out": False, "connections": [], "inputs": [False], "is_connected": [[False]] })
-							elif choosed_block == "OR": newBlocks.append({ "type": "OR", "pos": list(pos), "level": current_level, "out": False, "connections": [], "inputs": [False, False, False], "is_connected": [[False], [False], [False]] })
-							elif choosed_block == "Lever": newBlocks.append({ "type": "Lever", "pos": list(pos), "level": current_level, "out": False, "connections": [], "inputs": [], "is_connected": [] })
+							if choosed_block == "Generator": block = { "type": "Generator", "pos": list(pos), "level": current_level, "out": True, "connections": [], "inputs": [], "is_connected": []}
+							elif choosed_block == "Not": block = { "type": "Not", "pos": list(pos), "level": current_level, "out": False, "connections": [], "inputs": [False], "is_connected": [[False]] }
+							elif choosed_block == "OR": block = { "type": "OR", "pos": list(pos), "level": current_level, "out": False, "connections": [], "inputs": [False, False, False], "is_connected": [[False], [False], [False]] }
+							elif choosed_block == "Lever": block = { "type": "Lever", "pos": list(pos), "level": current_level, "out": False, "connections": [], "inputs": [], "is_connected": [] }
+							elif choosed_block == "Lamp": block = { "type": "Lamp", "pos": list(pos), "level": current_level, "out": False, "connections": [], "inputs": [False, False, False, False], "is_connected": [[False], [False], [False], [False]] }
+							newBlocks.append(block)
+							ServerBlocks.append(block)
 						else:
 							if current_block["type"] == "Lever":
 								current_block["out"] = not current_block["out"]
@@ -483,28 +485,35 @@ while running:
 					elif event.button == 1:
 						for bl in ServerBlocks:
 							if pos == bl["pos"] and current_level == bl["level"]:
-								for i in bl["is_connected"]:
-									if i[0]:
-										for bl2 in ServerBlocks:
-											if i[1]["pos"] == bl2["pos"] and i[1]["level"] == bl2["level"]:
-												for block, inID in bl2["connections"]:
-													if block["pos"] == bl["pos"] and block["level"] == bl["level"]:
-														bl2["connections"].remove([block, inID])
-														updatedBlocks.append(bl2)
-												break
-								for block, inID in bl["connections"]:
-									for bl2 in ServerBlocks:
-										if bl2["pos"] == block["pos"] and bl2["level"] == block["level"]:
-											bl2["inputs"][inID] = False
-											for index, i in enumerate(bl2["is_connected"]):
-												if i[0] and i[2] == inID:
-													bl2["is_connected"][index] = [False]
-											updatedBlocks.append(bl2)
-											break
-								deletedBlocks.append(bl)
+								if not (connecting[0] and bl["pos"] == connecting[1]["pos"] and bl["level"] == connecting[1]["level"]):
+									ServerBlocks.remove(bl)
+									deletedBlocks.append(bl)
+								break
 			elif event.type == pygame.KEYDOWN:
 				if event.key == pygame.K_f and not connecting[0]:
 					if current_level < 100: current_level += 1
+				elif event.key == pygame.K_v:
+					if CAMERA_MOVING_SPEED < MAX_CAMERA_MOVING_SPEED:
+						CAMERA_MOVING_SPEED += STEP_CAMERA_MOVING_SPEED
+						if CAMERA_MOVING_SPEED > MAX_CAMERA_MOVING_SPEED:
+							CAMERA_MOVING_SPEED = MAX_CAMERA_MOVING_SPEED
+					if CAMERA_MOVING_MODIFIER < MAX_CAMERA_MOVING_MODIFIER:
+						CAMERA_MOVING_MODIFIER += STEP_CAMERA_MOVING_MODIFIER
+						if CAMERA_MOVING_MODIFIER > MAX_CAMERA_MOVING_MODIFIER:
+							CAMERA_MOVING_MODIFIER = MAX_CAMERA_MOVING_MODIFIER
+					CameraSpeedMessage.changeText("Camera speed: {}/{}x".format(str(round(CAMERA_MOVING_SPEED)), str(round(CAMERA_MOVING_MODIFIER, 2))))
+					CameraSpeedMessage.is_alive = True
+				elif event.key == pygame.K_b:
+					if CAMERA_MOVING_SPEED > MIN_CAMERA_MOVING_SPEED:
+						CAMERA_MOVING_SPEED -= STEP_CAMERA_MOVING_SPEED
+						if CAMERA_MOVING_SPEED < MIN_CAMERA_MOVING_SPEED:
+							CAMERA_MOVING_SPEED = MIN_CAMERA_MOVING_SPEED
+					if CAMERA_MOVING_MODIFIER > MIN_CAMERA_MOVING_MODIFIER:
+						CAMERA_MOVING_MODIFIER -= STEP_CAMERA_MOVING_MODIFIER
+						if CAMERA_MOVING_MODIFIER < MIN_CAMERA_MOVING_MODIFIER:
+							CAMERA_MOVING_MODIFIER = MIN_CAMERA_MOVING_MODIFIER
+					CameraSpeedMessage.changeText("Camera speed: {}/{}x".format(str(round(CAMERA_MOVING_SPEED)), str(round(CAMERA_MOVING_MODIFIER, 2))))
+					CameraSpeedMessage.is_alive = True
 				elif event.key == pygame.K_g and not connecting[0]:
 					if current_level > 0: current_level -= 1
 				elif event.key == pygame.K_e:
@@ -521,7 +530,7 @@ while running:
 					if event.key == pygame.K_r:
 						if not connecting[0]:
 							for bl in ServerBlocks:
-								if bl["pos"] == pos and bl["level"] == current_level:
+								if bl["pos"] == pos and bl["level"] == current_level and not bl["type"] == "Lamp":
 									connecting[0] = True
 									connecting[1] = bl
 									break
@@ -530,7 +539,7 @@ while running:
 						if connecting[0]:
 							if connecting[1]["pos"] != pos:
 								for bl in ServerBlocks:
-									if bl["pos"] == pos and bl["level"] == current_level and (bl["type"] == "Not" or bl["type"] == "OR"):
+									if bl["pos"] == pos and bl["level"] == current_level and not bl["type"] == "Generator" and not bl["type"] == "Lever":
 										for bl2 in ServerBlocks:
 											if bl2["pos"] == connecting[1]["pos"] and bl2["level"] == connecting[1]["level"]:
 												for index, i in enumerate(bl["is_connected"]):
@@ -561,7 +570,6 @@ while running:
 
 
 
-
 		camera.move(click, mPos, keys)
 
 		if current_background != "gray":
@@ -580,17 +588,21 @@ while running:
 				elif bl["type"] == "Lever":
 					if not bl["out"]: screen.blit(LeverImage[0], camera.renderPos([bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize]))
 					else: screen.blit(LeverImage[1], camera.renderPos([bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize]))
-		for bl in ServerBlocks:
-			if bl["level"] == current_level:
-				if bl["type"] == "OR":
-					if bl["is_connected"][0][0]:
-						pygame.draw.line(screen, (10, 10, 10), camera.renderPos([(bl["pos"][0] + 0.5) * layoutCellSize, bl["pos"][1] * layoutCellSize]), camera.renderPos([(bl["is_connected"][0][1]["pos"][0] + 1) * layoutCellSize, (bl["is_connected"][0][1]["pos"][1] + 0.5) * layoutCellSize]), cableThickn)
-					if bl["is_connected"][1][0]:
-						pygame.draw.line(screen, (10, 10, 10), camera.renderPos([(bl["pos"][0] + 0.5) * layoutCellSize, (bl["pos"][1] + 1) * layoutCellSize]), camera.renderPos([(bl["is_connected"][1][1]["pos"][0] + 1) * layoutCellSize, (bl["is_connected"][1][1]["pos"][1] + 0.5) * layoutCellSize]), cableThickn)
-					if bl["is_connected"][2][0]:
-						pygame.draw.line(screen, (10, 10, 10), camera.renderPos([bl["pos"][0] * layoutCellSize, (bl["pos"][1] + 0.5) * layoutCellSize]), camera.renderPos([(bl["is_connected"][2][1]["pos"][0] + 1) * layoutCellSize, (bl["is_connected"][2][1]["pos"][1] + 0.5) * layoutCellSize]), cableThickn)
-				elif len(bl["is_connected"]) > 0 and bl["is_connected"][0][0]:
+				elif bl["type"] == "Lamp":
+					if bl["inputs"][0] or bl["inputs"][1] or bl["inputs"][2] or bl["inputs"][3]:
+						screen.blit(LampImage[1], camera.renderPos([bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize]))
+					else:
+						screen.blit(LampImage[0], camera.renderPos([bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize]))
+
+				if len(bl["is_connected"]) > 0 and bl["is_connected"][0][0]:
 					pygame.draw.line(screen, (10, 10, 10), camera.renderPos([bl["pos"][0] * layoutCellSize, (bl["pos"][1] + 0.5) * layoutCellSize]), camera.renderPos([(bl["is_connected"][0][1]["pos"][0] + 1) * layoutCellSize, (bl["is_connected"][0][1]["pos"][1] + 0.5) * layoutCellSize]), cableThickn)
+				if len(bl["is_connected"]) > 1 and bl["is_connected"][1][0]:
+					pygame.draw.line(screen, (10, 10, 10), camera.renderPos([(bl["pos"][0] + 0.5) * layoutCellSize, bl["pos"][1] * layoutCellSize]), camera.renderPos([(bl["is_connected"][1][1]["pos"][0] + 1) * layoutCellSize, (bl["is_connected"][1][1]["pos"][1] + 0.5) * layoutCellSize]), cableThickn)
+				if len(bl["is_connected"]) > 2 and bl["is_connected"][2][0]:
+					pygame.draw.line(screen, (10, 10, 10), camera.renderPos([(bl["pos"][0] + 0.5) * layoutCellSize, (bl["pos"][1] + 1) * layoutCellSize]), camera.renderPos([(bl["is_connected"][2][1]["pos"][0] + 1) * layoutCellSize, (bl["is_connected"][2][1]["pos"][1] + 0.5) * layoutCellSize]), cableThickn)
+				if len(bl["is_connected"]) > 3 and bl["is_connected"][3][0]:
+					pygame.draw.line(screen, (10, 10, 10), camera.renderPos([(bl["pos"][0] + 1) * layoutCellSize, (bl["pos"][1] + 0.5) * layoutCellSize]), camera.renderPos([(bl["is_connected"][3][1]["pos"][0] + 1) * layoutCellSize, (bl["is_connected"][3][1]["pos"][1] + 0.5) * layoutCellSize]), cableThickn)
+
 		if connecting[0]:
 			pygame.draw.line(screen, (10, 10, 10), camera.renderPos([(connecting[1]["pos"][0] + 1) * layoutCellSize, (connecting[1]["pos"][1] + 0.5) * layoutCellSize]), mPos, 4)
 		if not mouseOnUI():
@@ -600,8 +612,8 @@ while running:
 					surf = pygame.Surface((layoutCellSize, layoutCellSize))
 					surf.fill((10, 10, 10))
 					surf.set_alpha(blockInfoAlpha)
-					text1 = mainFont.render("IN: "+str(bl["inputs"]), FONTaa, (255, 255, 255))
-					text2 = mainFont.render("OUT: "+str(bl["out"]), FONTaa, (255, 255, 255))
+					text1 = mainFont.render("IN: "+str(bl["inputs"]).replace("False", "0").replace("True", "1"), FONTaa, (255, 255, 255))
+					text2 = mainFont.render("OUT: "+str(bl["out"]).replace("False", "0").replace("True", "1"), FONTaa, (255, 255, 255))
 					rect1 = text1.get_rect(centerx = bl["pos"][0] * layoutCellSize + layoutCellSize // 2)
 					rect2 = text2.get_rect(centerx = bl["pos"][0] * layoutCellSize + layoutCellSize // 2)
 					rect1.bottom = bl["pos"][1] * layoutCellSize + layoutCellSize // 2
@@ -676,7 +688,8 @@ while running:
 				if not BlockControl["active"]:
 					for pr in backgroundPreviews: pr.draw(screen)
 				else:
-					for pr in blockPreviews: pr.draw(screen)
+					for pr in blockPreviews:
+						pr.draw(screen)
 				backgroundControl["CloseBGCButton"].draw(screen)
 
 		else:
@@ -723,3 +736,4 @@ while running:
 	pygame.draw.circle(screen, Cursors["self"]["color"], mPos, Cursors["self"]["radius"])
 	pygame.display.flip()
 	clock.tick(60)
+	ticks += 1
