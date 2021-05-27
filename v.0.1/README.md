@@ -1,4 +1,4 @@
-#Untitled Binay Logics SImulator (UBLS)
+#Untitled Binary Logic Simulator (UBLS)
 
 A game/teaching tool made by a single junior developer in less than a year.
 
