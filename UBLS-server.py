@@ -56,77 +56,78 @@ class Client:
 	def thread(self):
 		global updatedBlocks1
 		while running:
-			# try:
-			data = ""
-			while True:
-				_data = self.socket.recv(16384).decode("utf-8")
-				if not _data: raise Exception()
-				data += _data
-				if data[-1] == "=":
-					data = data[:-1]
-					break
-			data = json.loads(data)
-			self.mPos = data["mPos"]
-			self.level = data["myLevel"]
-			self.connecting = data["connecting"]
-			for i in data["newBlocks"]:
-				ID = len(serverBlocks)
-				serverBlocks.append(i)
-				updatedBl = updateBlock(serverBlocks[ID])
-				updatedBlocks1 = []
-				if updatedBl != None: serverBlocks[ID] = updatedBl
-				for c in clients:
-					c.newBlocks.append(serverBlocks[ID])
-
-			for i in data["deletedBlocks"]:
-				for bl in serverBlocks:
-					if i["pos"] == bl["pos"] and i["level"] == bl["level"]:
-						for c in clients:
-							c.deletedBlocks.append({"pos": bl["pos"], "level": bl["level"]})
-						serverBlocks.remove(bl)
-						updateBlock(bl)
-						updatedBlocks1 = []
+			try:
+				data = ""
+				while True:
+					_data = self.socket.recv(16384).decode("utf-8")
+					if not _data: raise Exception()
+					data += _data
+					if data[-1] == "=":
+						data = data[:-1]
 						break
+				data = json.loads(data)
+				self.mPos = data["mPos"]
+				self.level = data["myLevel"]
+				self.connecting = data["connecting"]
+				for i in data["newBlocks"]:
+					ID = len(serverBlocks)
+					serverBlocks.append(i)
+					updatedBl = updateBlock(serverBlocks[ID])
+					updatedBlocks1 = []
+					if updatedBl != None: serverBlocks[ID] = updatedBl
+					for c in clients:
+						c.newBlocks.append(serverBlocks[ID])
 
-			for i in data["updatedBlocks"]:
-				for index, bl2 in enumerate(serverBlocks):
-					if i["pos"] == bl2["pos"] and i["level"] == bl2["level"]:
-						serverBlocks[index] = i
-						updatedBl = updateBlock(serverBlocks[index])
-						updatedBlocks1 = []
-						if updatedBl != None: serverBlocks[index] = updatedBl
-						break
+				for i in data["deletedBlocks"]:
+					for bl in serverBlocks:
+						if i["pos"] == bl["pos"] and i["level"] == bl["level"]:
+							for c in clients:
+								c.deletedBlocks.append({"pos": bl["pos"], "level": bl["level"]})
+							serverBlocks.remove(bl)
+							updateBlock(bl)
+							updatedBlocks1 = []
+							break
 
-			reply = {"newBlocks": [], "updatedBlocks": [], "deletedBlocks": []}
-			reply["newBlocks"] = self.newBlocks
-			self.newBlocks = []	
-			reply["deletedBlocks"] = self.deletedBlocks
-			self.deletedBlocks = []
-			reply["updatedBlocks"] = self.updatedBlocks
-			self.updatedBlocks = []
+				for i in data["updatedBlocks"]:
+					for index, bl2 in enumerate(serverBlocks):
+						if i["pos"] == bl2["pos"] and i["level"] == bl2["level"]:
+							serverBlocks[index] = i
+							updatedBl = updateBlock(serverBlocks[index])
+							updatedBlocks1 = []
+							if updatedBl != None: serverBlocks[index] = updatedBl
+							break
+
+				reply = {"newBlocks": [], "updatedBlocks": [], "deletedBlocks": []}
+				reply["newBlocks"] = self.newBlocks
+				self.newBlocks = []	
+				reply["deletedBlocks"] = self.deletedBlocks
+				self.deletedBlocks = []
+				reply["updatedBlocks"] = self.updatedBlocks
+				self.updatedBlocks = []
 
 
 
-			reply["PlayersData"] = [{"mPos": c.mPos, "nickname": c.nickname, "level": c.level, "connecting": c.connecting} for c in clients if c.id != self.id]
-			reply = json.dumps(reply) + "="
-			self.socket.send(reply.encode())
-			time.sleep(0.015)
-			# except Exception as ex:
-			# 	print("[EXCEPTION]", ex)
-			# 	break
+				reply["PlayersData"] = [{"mPos": c.mPos, "nickname": c.nickname, "level": c.level, "connecting": c.connecting} for c in clients if c.id != self.id]
+				reply = json.dumps(reply) + "="
+				self.socket.send(reply.encode())
+				time.sleep(0.015)
+			except Exception as ex:
+				print("[EXCEPTION]", ex)
+				break
 		print("[INFO] {} has disconnected".format(self.nickname))
 		self.socket.close()
 		clients.remove(self)
 
 updatedBlocks1 = []
-def updateBlock(block):
+def updateBlock(block, source=None):
 	global updatedBlocks1
 	exists = False
-	for bl2 in updatedBlocks1:
-		if bl2["pos"] == block["pos"] and bl2["level"] == block["level"]:
-			exists = True
-			break
-	updatedBlocks1.append(block)
+	if source != None:
+		for bl2 in updatedBlocks1:
+			if bl2[0]["pos"] == block["pos"] and bl2[0]["level"] == block["level"] and bl2[1] == source:
+				exists = True
+				break
+	updatedBlocks1.append([block, source])
 	if not exists:
 		if block["type"] == "Generator" or block["type"] == "Lever":
 			for bl, inID in block["connections"]:
@@ -135,7 +136,7 @@ def updateBlock(block):
 					if bl2["pos"] == bl["pos"] and bl2["level"] == bl["level"]:
 						found = True
 						bl2["inputs"][inID] = block["out"]
-						updatedBl = updateBlock(bl2)
+						updatedBl = updateBlock(bl2, {"pos": block["pos"], "level": block["level"]})
 						if updatedBl != None: serverBlocks[index] = updatedBl
 						break
 				if not found: block["connections"].remove([bl, inID])
@@ -160,7 +161,7 @@ def updateBlock(block):
 					if bl2["pos"] == bl["pos"] and bl2["level"] == bl["level"]:
 						found = True
 						bl2["inputs"][inID] = block["out"]
-						updatedBl = updateBlock(bl2)
+						updatedBl = updateBlock(bl2, block)
 						if updatedBl != None: serverBlocks[index] = updatedBl
 						break
 				if not found: block["connections"].remove([bl, inID])

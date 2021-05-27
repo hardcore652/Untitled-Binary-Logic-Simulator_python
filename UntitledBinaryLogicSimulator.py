@@ -288,39 +288,39 @@ def socketThread():
 	global clientSocket, running, connected, mPos, PlayersData, newBlocks, deletedBlocks, ServerBlocks, current_level, updatedBlocks, connecting
 		
 	while running:
-		#try:
-		data = {"mPos": [mPos[0] + camera.rect.x, mPos[1] + camera.rect.y], "newBlocks":newBlocks,
-			"deletedBlocks": deletedBlocks, "updatedBlocks": updatedBlocks,
-			"myLevel": current_level, "connecting": connecting}
-		newBlocks = []
-		deletedBlocks = []
-		updatedBlocks = []
-		clientSocket.send((json.dumps(data)+"=").encode())
-		recieved = ""
-		while True:
-			_recieved = clientSocket.recv(16384).decode("utf-8")
-			if not _recieved: running, connected = False, False
-			recieved += _recieved
-			if recieved[-1] == "=":
-				recieved = recieved[:-1]
-				break
-		recieved = json.loads(recieved)
-		PlayersData = recieved["PlayersData"]
-		for bl in recieved["updatedBlocks"]:
-			for index, bl2 in enumerate(ServerBlocks):
-				if bl["pos"] == bl2["pos"] and bl["level"] == bl2["level"]:
-					ServerBlocks[index] = bl
-		for bl in recieved["newBlocks"]:
-			ServerBlocks.append(bl)
-		for bl in recieved["deletedBlocks"]:
-			for bl2 in ServerBlocks:
-				if bl["pos"] == bl2["pos"] and bl["level"] == bl2["level"]:
-					ServerBlocks.remove(bl2)
-		#except:
-			# CloseButton.rect.centerx = screenSize[0] // 2
-			# CloseButton.text_rect.centerx = screenSize[0] // 2
-			# connected = False
-			# break
+		try:
+			data = {"mPos": [mPos[0] + camera.rect.x, mPos[1] + camera.rect.y], "newBlocks":newBlocks,
+				"deletedBlocks": deletedBlocks, "updatedBlocks": updatedBlocks,
+				"myLevel": current_level, "connecting": connecting}
+			newBlocks = []
+			deletedBlocks = []
+			updatedBlocks = []
+			clientSocket.send((json.dumps(data)+"=").encode())
+			recieved = ""
+			while True:
+				_recieved = clientSocket.recv(16384).decode("utf-8")
+				if not _recieved: running, connected = False, False
+				recieved += _recieved
+				if recieved[-1] == "=":
+					recieved = recieved[:-1]
+					break
+			recieved = json.loads(recieved)
+			PlayersData = recieved["PlayersData"]
+			for bl in recieved["updatedBlocks"]:
+				for index, bl2 in enumerate(ServerBlocks):
+					if bl["pos"] == bl2["pos"] and bl["level"] == bl2["level"]:
+						ServerBlocks[index] = bl
+			for bl in recieved["newBlocks"]:
+				ServerBlocks.append(bl)
+			for bl in recieved["deletedBlocks"]:
+				for bl2 in ServerBlocks:
+					if bl["pos"] == bl2["pos"] and bl["level"] == bl2["level"]:
+						ServerBlocks.remove(bl2)
+		except:
+			CloseButton.rect.centerx = screenSize[0] // 2
+			CloseButton.text_rect.centerx = screenSize[0] // 2
+			connected = False
+			break
 PlayersData = []
 newBlocks = []
 deletedBlocks = []
@@ -526,46 +526,46 @@ while running:
 						BlockControl["active"] = False
 						backgroundControl["closeAnim"] = 1
 
-				elif not mouseOnUI():
-					if event.key == pygame.K_r:
-						if not connecting[0]:
+				if event.key == pygame.K_r:
+					if not connecting[0]:
+						if not mouseOnUI():
 							for bl in ServerBlocks:
 								if bl["pos"] == pos and bl["level"] == current_level and not bl["type"] == "Lamp":
 									connecting[0] = True
 									connecting[1] = bl
 									break
-						else: connecting = [False, {}]
-					elif event.key == pygame.K_t:
-						if connecting[0]:
-							if connecting[1]["pos"] != pos:
-								for bl in ServerBlocks:
-									if bl["pos"] == pos and bl["level"] == current_level and not bl["type"] == "Generator" and not bl["type"] == "Lever":
-										for bl2 in ServerBlocks:
-											if bl2["pos"] == connecting[1]["pos"] and bl2["level"] == connecting[1]["level"]:
-												for index, i in enumerate(bl["is_connected"]):
-													if not i[0]:
-														bl["is_connected"][index] = [True, {"pos": bl2["pos"], "level": bl2["level"]}, index]
-														updatedBlocks.append(bl)
-														bl2["connections"].append([{"pos": bl["pos"], "level": bl["level"]}, index])
-														updatedBlocks.append(bl2)
-														connecting[0] = False
-														break
-												break
-										break
-						else:
-							if bl["pos"] == pos and bl["level"] == current_level:
-								a = len(bl["is_connected"]) - 1
-								for i in range(len(bl["is_connected"])):
-									if bl["is_connected"][a - i][0]:
-										for bl2 in ServerBlocks:
-											if bl2["pos"] == bl["is_connected"][a - i][1]["pos"] and bl2["level"] == bl["is_connected"][a - i][1]["level"]:
-												bl2["connections"].remove([{"pos": bl["pos"], "level": bl["level"]}, bl["is_connected"][a - i][2]])
-												updatedBlocks.append(bl2)
-												connecting = [True, bl2]
-												break
-										bl["is_connected"][a - i] = [False]
-										updatedBlocks.append(bl)
-										break
+					else: connecting = [False, {}]
+				elif event.key == pygame.K_t:
+					if connecting[0]:
+						if connecting[1]["pos"] != pos:
+							for bl in ServerBlocks:
+								if bl["pos"] == pos and bl["level"] == current_level and not bl["type"] == "Generator" and not bl["type"] == "Lever":
+									for bl2 in ServerBlocks:
+										if bl2["pos"] == connecting[1]["pos"] and bl2["level"] == connecting[1]["level"]:
+											for index, i in enumerate(bl["is_connected"]):
+												if not i[0]:
+													bl["is_connected"][index] = [True, {"pos": bl2["pos"], "level": bl2["level"]}, index]
+													updatedBlocks.append(bl)
+													bl2["connections"].append([{"pos": bl["pos"], "level": bl["level"]}, index])
+													updatedBlocks.append(bl2)
+													connecting[0] = False
+													break
+											break
+									break
+					else:
+						if bl["pos"] == pos and bl["level"] == current_level:
+							a = len(bl["is_connected"]) - 1
+							for i in range(len(bl["is_connected"])):
+								if bl["is_connected"][a - i][0]:
+									for bl2 in ServerBlocks:
+										if bl2["pos"] == bl["is_connected"][a - i][1]["pos"] and bl2["level"] == bl["is_connected"][a - i][1]["level"]:
+											bl2["connections"].remove([{"pos": bl["pos"], "level": bl["level"]}, bl["is_connected"][a - i][2]])
+											updatedBlocks.append(bl2)
+											connecting = [True, bl2]
+											break
+									bl["is_connected"][a - i] = [False]
+									updatedBlocks.append(bl)
+									break
 
 
 
@@ -593,7 +593,8 @@ while running:
 						screen.blit(LampImage[1], camera.renderPos([bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize]))
 					else:
 						screen.blit(LampImage[0], camera.renderPos([bl["pos"][0] * layoutCellSize, bl["pos"][1] * layoutCellSize]))
-
+		for bl in ServerBlocks:
+			if bl["level"] == current_level:
 				if len(bl["is_connected"]) > 0 and bl["is_connected"][0][0]:
 					pygame.draw.line(screen, (10, 10, 10), camera.renderPos([bl["pos"][0] * layoutCellSize, (bl["pos"][1] + 0.5) * layoutCellSize]), camera.renderPos([(bl["is_connected"][0][1]["pos"][0] + 1) * layoutCellSize, (bl["is_connected"][0][1]["pos"][1] + 0.5) * layoutCellSize]), cableThickn)
 				if len(bl["is_connected"]) > 1 and bl["is_connected"][1][0]:
